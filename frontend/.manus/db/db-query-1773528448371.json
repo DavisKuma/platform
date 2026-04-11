@@ -1,0 +1,70 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jobs' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jobs' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id"
+    },
+    {
+      "COLUMN_NAME": "company"
+    },
+    {
+      "COLUMN_NAME": "location"
+    },
+    {
+      "COLUMN_NAME": "employeeCount"
+    },
+    {
+      "COLUMN_NAME": "jobTitle"
+    },
+    {
+      "COLUMN_NAME": "salaryMin"
+    },
+    {
+      "COLUMN_NAME": "salaryMax"
+    },
+    {
+      "COLUMN_NAME": "isNewEntrantFriendly"
+    },
+    {
+      "COLUMN_NAME": "isVerifiedSponsor"
+    },
+    {
+      "COLUMN_NAME": "hiringManager"
+    },
+    {
+      "COLUMN_NAME": "hiringManagerEmail"
+    },
+    {
+      "COLUMN_NAME": "companyDescription"
+    },
+    {
+      "COLUMN_NAME": "industry"
+    },
+    {
+      "COLUMN_NAME": "postedDays"
+    },
+    {
+      "COLUMN_NAME": "createdAt"
+    },
+    {
+      "COLUMN_NAME": "updatedAt"
+    },
+    {
+      "COLUMN_NAME": "source"
+    },
+    {
+      "COLUMN_NAME": "linkedinUrl"
+    },
+    {
+      "COLUMN_NAME": "companyLinkedinUrl"
+    },
+    {
+      "COLUMN_NAME": "linkedinDescription"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nid\ncompany\nlocation\nemployeeCount\njobTitle\nsalaryMin\nsalaryMax\nisNewEntrantFriendly\nisVerifiedSponsor\nhiringManager\nhiringManagerEmail\ncompanyDescription\nindustry\npostedDays\ncreatedAt\nupdatedAt\nsource\nlinkedinUrl\ncompanyLinkedinUrl\nlinkedinDescription\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

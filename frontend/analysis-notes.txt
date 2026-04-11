@@ -1,0 +1,21 @@
+CSV Analysis (GOV.UK Register of Licensed Sponsors):
+- 140,834 rows total
+- Columns: Organisation Name, Town/City, County, Type & Rating, Route
+- 118,881 Skilled Worker entries (most relevant)
+- Mostly small businesses, many retail/food/care companies
+- No employee count, no job titles, no salary data in CSV
+- This is the SPONSOR LICENSE list, not job listings
+
+Hunt UK Visa Sponsors site:
+- 117,470+ job vacancies, 124,759+ licensed sponsors
+- Shows: Latest Jobs with company name, description, location, date
+- Shows: Companies section with visa count, job count, industry
+- Data sourced from UK Government + various job platforms
+- Updated 13/03/2026
+
+Integration Plan:
+1. Import GOV.UK sponsor CSV into a new sponsors table (verified sponsors)
+2. Use n8n + Apify LinkedIn scraper to find jobs at these sponsor companies
+3. n8n workflow: CSV sponsors -> filter small companies -> Apify LinkedIn search -> webhook to our API
+4. ChatGPT API for email generation (already using built-in LLM)
+5. Match LinkedIn jobs with verified sponsors for trust badges

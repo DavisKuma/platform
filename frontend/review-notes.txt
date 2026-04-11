@@ -1,0 +1,47 @@
+Full SaaS Upgrade + n8n + Apollo Integration Review (Phase 9)
+===============================================================
+
+1. Navbar: WORKING
+   - Auth-aware: shows Dashboard, My Matches, Outreach, Admin (for admin users)
+   - Dark mode toggle (moon/sun icon) visible
+   - User name + logout button visible when authenticated
+   - Custom Plan CTA button present
+
+2. Hero Section: WORKING
+   - "121,000+ verified sponsors" in floating card (real data)
+   - CV upload simulation functional
+
+3. All pages created:
+   - Dashboard (/dashboard) - overview stats, recent matches, recent outreach
+   - My Matches (/matches) - saved jobs with unsave + generate email
+   - Outreach History (/outreach) - all generated emails with copy/gmail/expand
+   - Admin Jobs (/admin) - CRUD + Refresh Newest Jobs button + filters
+
+4. Backend features:
+   - Real AI email generation via LLM (Sienna-style system prompt)
+   - Stripe checkout for Custom Plan (£29/mo, £199/year)
+   - Webhook handler for subscription events
+   - Save/unsave matches
+   - Outreach history tracking
+   - CV upload to S3
+   - Admin CRUD for jobs
+   - Free tier: 3 emails/day limit, 3 visible matches (blurred paywall)
+
+5. n8n Workflows:
+   - LinkedIn Scraper: ID 5eYwxnmopfHOKQTB (active, runs every 12h)
+   - Apollo Enrichment: ID x26td0eY3xOSKlyb (active, webhook-triggered)
+   - Both push to /api/webhook/jobs with GOV.UK cross-reference
+
+6. Admin Panel Updates:
+   - "Refresh Newest Jobs" button triggers n8n Apollo workflow
+   - Last refreshed date + new jobs count display
+   - Search, filter (small companies only, verified only, new entrant only)
+   - Add/Edit/Delete manual overrides preserved
+
+7. Public Dashboard:
+   - Free users see 3 matches, rest blurred with paywall overlay
+   - "Unlock All" button opens pricing modal
+   - Paid users see all matches
+
+8. Tests: 48 passing (4 test files)
+9. TypeScript: 0 errors

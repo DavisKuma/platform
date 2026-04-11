@@ -1,0 +1,25 @@
+{
+  "query": "SELECT COUNT(*) as job_count FROM jobs; SELECT COUNT(*) as template_count FROM email_templates; SELECT COUNT(*) as cv_count FROM demo_cvs;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT COUNT(*) as job_count FROM jobs; SELECT COUNT(*) as template_count FROM email_templates; SELECT COUNT(*) as cv_count FROM demo_cvs;",
+  "rows": [
+    {
+      "job_count": "23"
+    },
+    {
+      "job_count": "template_count"
+    },
+    {
+      "job_count": "3"
+    },
+    {
+      "job_count": "cv_count"
+    },
+    {
+      "job_count": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "job_count\n23\ntemplate_count\n3\ncv_count\n1\n",
+  "stderr": "",
+  "execution_time_ms": 118
+}

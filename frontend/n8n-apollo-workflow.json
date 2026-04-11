@@ -1,0 +1,467 @@
+{
+  "name": "MicroSponsor AI - Apollo Enriched UK Sponsor Jobs",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "microsponsor-refresh"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Download and parse the GOV.UK sponsor CSV\n// Filter for Skilled Worker route sponsors only\nconst csvUrl = 'https://assets.publishing.service.gov.uk/media/69b3d0b1c8010d37b34e0111/2026-03-13_-_Worker_and_Temporary_Worker.csv';\n\ntry {\n  const response = await fetch(csvUrl);\n  const csvText = await response.text();\n  const lines = csvText.split('\\n');\n  const headers = lines[0].split(',').map(h => h.trim().replace(/\"/g, ''));\n  \n  // Parse all sponsors\n  const allSponsors = [];\n  for (let i = 1; i < lines.length; i++) {\n    if (!lines[i].trim()) continue;\n    // Handle CSV with possible quoted fields\n    const cols = lines[i].match(/(\"[^\"]*\"|[^,]*)/g) || [];\n    const clean = cols.map(c => c.replace(/^\"|\"$/g, '').trim());\n    \n    const name = clean[0] || '';\n    const town = clean[1] || '';\n    const county = clean[2] || '';\n    const typeRating = clean[3] || '';\n    const route = clean[4] || '';\n    \n    // Only include Skilled Worker route\n    if (!route.toLowerCase().includes('skilled worker')) continue;\n    \n    allSponsors.push({ name, town, county, typeRating, route });\n  }\n  \n  // Randomly sample 50 sponsors to check via Apollo\n  // (API rate limits mean we can't check all 120K+)\n  const shuffled = allSponsors.sort(() => Math.random() - 0.5);\n  const sample = shuffled.slice(0, 50);\n  \n  return sample.map(s => ({ json: s }));\n} catch (error) {\n  return [{ json: { error: error.message, sponsors: [] } }];\n}"
+      },
+      "id": "parse-csv",
+      "name": "Download & Parse GOV.UK CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-sponsors",
+      "name": "Loop Over Sponsors",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/mixed_companies/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ q_organization_name: $json.name, organization_locations: ['United Kingdom'], organization_num_employees_ranges: ['1,100'], page: 1, per_page: 1 }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "apollo-org-search",
+      "name": "Apollo Org Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uZNJupU1MVlTeFyH",
+          "name": "Header Auth account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if Apollo found the company and it has ≤100 employees\nconst item = $input.first().json;\nconst sponsorName = $('Loop Over Sponsors').item.json.name;\nconst sponsorTown = $('Loop Over Sponsors').item.json.town;\n\nconst accounts = item.accounts || [];\nif (accounts.length === 0) {\n  return [{ json: { skip: true, reason: 'not_found', company: sponsorName } }];\n}\n\nconst org = accounts[0];\nconst orgId = org.organization_id || org.id;\nconst domain = org.domain || '';\nconst name = org.name || sponsorName;\n\n// We'll need to enrich to get employee count\nreturn [{ json: { \n  skip: false,\n  orgId,\n  domain,\n  name,\n  sponsorName,\n  sponsorTown,\n  industry: org.industry || 'Unknown'\n} }];"
+      },
+      "id": "check-org-found",
+      "name": "Check Org Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "filter-skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-found",
+      "name": "Filter Found Orgs",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apollo.io/v1/organizations/enrich",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ domain: $json.domain }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "apollo-enrich",
+      "name": "Apollo Enrich Org",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uZNJupU1MVlTeFyH",
+          "name": "Header Auth account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter: only keep companies with ≤100 employees\nconst item = $input.first().json;\nconst prev = $('Check Org Found').item.json;\nconst org = item.organization || {};\n\nconst empCount = org.estimated_num_employees || 999;\nif (empCount > 100) {\n  return [{ json: { skip: true, reason: 'too_large', company: prev.name, employees: empCount } }];\n}\n\nreturn [{ json: {\n  skip: false,\n  orgId: prev.orgId || org.id,\n  name: org.name || prev.name,\n  sponsorName: prev.sponsorName,\n  sponsorTown: prev.sponsorTown,\n  domain: org.primary_domain || prev.domain,\n  employees: empCount,\n  industry: org.industry || prev.industry || 'Unknown',\n  description: (org.short_description || '').substring(0, 500),\n  linkedinUrl: org.linkedin_url || '',\n  websiteUrl: org.website_url || '',\n  foundedYear: org.founded_year || null,\n  city: org.city || prev.sponsorTown || 'United Kingdom',\n  country: org.country || 'United Kingdom'\n} }];"
+      },
+      "id": "filter-small",
+      "name": "Filter ≤100 Employees",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "filter-small-check",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-small-orgs",
+      "name": "Only Small Orgs",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [1760, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.apollo.io/v1/organizations/{{ $json.orgId }}/job_postings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "apollo-job-postings",
+      "name": "Apollo Job Postings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uZNJupU1MVlTeFyH",
+          "name": "Header Auth account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine org data with job postings\nconst item = $input.first().json;\nconst org = $('Filter ≤100 Employees').item.json;\nconst postings = item.organization_job_postings || [];\n\nif (postings.length === 0) {\n  // No active job postings - still include the company with a generic role\n  return [{ json: {\n    company: org.name,\n    sponsorName: org.sponsorName,\n    location: org.city || 'United Kingdom',\n    employeeCount: org.employees,\n    industry: org.industry,\n    description: org.description,\n    linkedinUrl: org.linkedinUrl,\n    websiteUrl: org.websiteUrl,\n    hasJobPostings: false,\n    jobs: [{\n      title: 'Open to Applications',\n      location: org.city || 'United Kingdom',\n      url: org.websiteUrl || org.linkedinUrl || '',\n      salaryMin: 25000,\n      salaryMax: 40000\n    }]\n  } }];\n}\n\n// Filter for UK-based jobs only, take top 3\nconst ukJobs = postings\n  .filter(p => {\n    const loc = (p.city || p.location || '').toLowerCase();\n    const country = (p.country || '').toLowerCase();\n    return country.includes('united kingdom') || country.includes('uk') || \n           loc.includes('london') || loc.includes('manchester') || \n           loc.includes('birmingham') || loc.includes('edinburgh') ||\n           loc.includes('bristol') || loc.includes('leeds') || loc.includes('cambridge');\n  })\n  .slice(0, 3);\n\nif (ukJobs.length === 0 && postings.length > 0) {\n  // Use first posting regardless of location\n  ukJobs.push(postings[0]);\n}\n\nconst jobsList = ukJobs.map(p => ({\n  title: p.title || 'Open Role',\n  location: p.city || org.city || 'United Kingdom',\n  url: p.url || '',\n  salaryMin: 25000,\n  salaryMax: 40000\n}));\n\nreturn [{ json: {\n  company: org.name,\n  sponsorName: org.sponsorName,\n  location: org.city || 'United Kingdom',\n  employeeCount: org.employees,\n  industry: org.industry,\n  description: org.description,\n  linkedinUrl: org.linkedinUrl,\n  websiteUrl: org.websiteUrl,\n  hasJobPostings: true,\n  jobs: jobsList\n} }];"
+      },
+      "id": "combine-data",
+      "name": "Combine Org + Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 0]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an expert UK job market writer. Write a short, attractive job description (2-3 sentences) for this role at a small UK company with visa sponsorship.\n\nCompany: {{ $json.company }}\nIndustry: {{ $json.industry }}\nCompany Description: {{ $json.description }}\nEmployee Count: {{ $json.employeeCount }}\nLocation: {{ $json.location }}\nJob Title: {{ $json.jobs[0].title }}\n\nWrite a compelling 2-3 sentence description that highlights: what the company does, why this role is exciting, and that they are a verified UK visa sponsor. Keep it professional and concise. Output ONLY the description text, nothing else."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "chatgpt-description",
+      "name": "ChatGPT Job Description",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [2420, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "pn44FY7CxYQLsIAx",
+          "name": "OpenAi account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build final job objects to push to MicroSponsor webhook\nconst orgData = $('Combine Org + Jobs').item.json;\nconst aiDescription = $input.first().json.output?.[0]?.content?.[0]?.text || $input.first().json.text || orgData.description || '';\n\nconst results = [];\nfor (const job of orgData.jobs) {\n  results.push({\n    json: {\n      company: orgData.company,\n      jobTitle: job.title,\n      location: job.location || orgData.location || 'United Kingdom',\n      employeeCount: orgData.employeeCount,\n      salaryMin: job.salaryMin || 25000,\n      salaryMax: job.salaryMax || 40000,\n      isNewEntrantFriendly: true,\n      companyDescription: aiDescription,\n      industry: orgData.industry || 'Technology',\n      linkedinUrl: job.url || orgData.linkedinUrl || '',\n      companyLinkedinUrl: orgData.linkedinUrl || '',\n      hiringManager: 'Hiring Manager',\n      hiringManagerEmail: '',\n      postedDays: 0\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "build-jobs",
+      "name": "Build Job Objects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://microspons-rezhphfb.manus.space/api/webhook/jobs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-webhook-secret",
+              "value": "microsponsor-n8n-2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jobs: $input.all().map(i => i.json) }) }}"
+      },
+      "id": "push-to-microsponsor",
+      "name": "Push to MicroSponsor DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2860, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return summary of the refresh operation\nconst webhookResult = $input.first().json;\nreturn [{ json: {\n  success: true,\n  message: 'Refresh complete',\n  results: webhookResult.results || { inserted: 0, updated: 0, verified: 0 },\n  timestamp: new Date().toISOString()\n} }];"
+      },
+      "id": "return-summary",
+      "name": "Return Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3080, 0]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download & Parse GOV.UK CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download & Parse GOV.UK CSV": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Sponsors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Sponsors": {
+      "main": [
+        [
+          {
+            "node": "Return Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apollo Org Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apollo Org Search": {
+      "main": [
+        [
+          {
+            "node": "Check Org Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Org Found": {
+      "main": [
+        [
+          {
+            "node": "Filter Found Orgs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Found Orgs": {
+      "main": [
+        [
+          {
+            "node": "Apollo Enrich Org",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apollo Enrich Org": {
+      "main": [
+        [
+          {
+            "node": "Filter ≤100 Employees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter ≤100 Employees": {
+      "main": [
+        [
+          {
+            "node": "Only Small Orgs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Small Orgs": {
+      "main": [
+        [
+          {
+            "node": "Apollo Job Postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apollo Job Postings": {
+      "main": [
+        [
+          {
+            "node": "Combine Org + Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Org + Jobs": {
+      "main": [
+        [
+          {
+            "node": "ChatGPT Job Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChatGPT Job Description": {
+      "main": [
+        [
+          {
+            "node": "Build Job Objects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Job Objects": {
+      "main": [
+        [
+          {
+            "node": "Push to MicroSponsor DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push to MicroSponsor DB": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Sponsors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

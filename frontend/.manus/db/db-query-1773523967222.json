@@ -1,0 +1,31 @@
+{
+  "query": "SELECT COUNT(*) as total FROM sponsors; SELECT organisationName, townCity, county, route FROM sponsors LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT COUNT(*) as total FROM sponsors; SELECT organisationName, townCity, county, route FROM sponsors LIMIT 5;",
+  "rows": [
+    {
+      "total": "121033"
+    },
+    {
+      "total": "organisationName\ttownCity\tcounty\troute"
+    },
+    {
+      "total": "McMullan Shellfish\tBallymena\tCo Antrim\tSkilled Worker"
+    },
+    {
+      "total": "1ST ADTUBE LIMITED\tLondon\tNULL\tSkilled Worker"
+    },
+    {
+      "total": "1ST CHOICE CABS LTD\tILFORD\tNULL\tSkilled Worker"
+    },
+    {
+      "total": "A KARIM PHARMA LTD\tClayton, Bradford\tNULL\tSkilled Worker"
+    },
+    {
+      "total": "A M ELECTRICAL INSTALLATIONS LIMITED\tHalesowen\tWest Midlands\tSkilled Worker"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n121033\norganisationName\ttownCity\tcounty\troute\nMcMullan Shellfish\tBallymena\tCo Antrim\tSkilled Worker\n1ST ADTUBE LIMITED\tLondon\tNULL\tSkilled Worker\n1ST CHOICE CABS LTD\tILFORD\tNULL\tSkilled Worker\nA KARIM PHARMA LTD\tClayton, Bradford\tNULL\tSkilled Worker\nA M ELECTRICAL INSTALLATIONS LIMITED\tHalesowen\tWest Midlands\tSkilled Worker\n",
+  "stderr": "",
+  "execution_time_ms": 164
+}

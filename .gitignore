@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Output CSVs (generated data)
+*_sponsored_jobs_*.csv
+recommendations_*.csv
+
+# Uploaded CVs / test files
+*.pdf
+
+# Archives
+*.zip
+
+# Node (frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Misc
+command.txt
+*.log

@@ -1,0 +1,22 @@
+{
+  "query": "SELECT COUNT(*) as total_jobs FROM jobs; SELECT source, COUNT(*) as count FROM jobs GROUP BY source;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT COUNT(*) as total_jobs FROM jobs; SELECT source, COUNT(*) as count FROM jobs GROUP BY source;",
+  "rows": [
+    {
+      "total_jobs": "123"
+    },
+    {
+      "total_jobs": "source\tcount"
+    },
+    {
+      "total_jobs": "manual\t23"
+    },
+    {
+      "total_jobs": "airtable_sync\t100"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_jobs\n123\nsource\tcount\nmanual\t23\nairtable_sync\t100\n",
+  "stderr": "",
+  "execution_time_ms": 95
+}

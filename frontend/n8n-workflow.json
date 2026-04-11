@@ -1,0 +1,143 @@
+{
+  "name": "MicroSponsor AI - UK Visa Sponsor Jobs Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate LinkedIn job search URLs for UK visa-sponsored roles\n// Focus on micro-SME companies with ≤100 employees\nconst searchUrls = [\n  // Skilled Worker visa-friendly roles at small companies\n  'https://www.linkedin.com/jobs/search/?keywords=visa%20sponsorship&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  'https://www.linkedin.com/jobs/search/?keywords=sponsor%20visa&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  'https://www.linkedin.com/jobs/search/?keywords=skilled%20worker%20visa&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  // Tech roles at small companies\n  'https://www.linkedin.com/jobs/search/?keywords=software%20developer%20sponsorship&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  'https://www.linkedin.com/jobs/search/?keywords=data%20analyst%20visa%20sponsor&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  // Graduate-friendly roles\n  'https://www.linkedin.com/jobs/search/?keywords=graduate%20visa%20sponsorship&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  'https://www.linkedin.com/jobs/search/?keywords=junior%20developer%20sponsorship&location=London&f_TPR=r604800&f_CS=2&sortBy=DD',\n  // Finance and business roles\n  'https://www.linkedin.com/jobs/search/?keywords=accountant%20visa%20sponsorship&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD',\n  'https://www.linkedin.com/jobs/search/?keywords=marketing%20visa%20sponsor&location=United%20Kingdom&f_TPR=r604800&f_CS=2&sortBy=DD'\n];\n\nreturn [{ json: { urls: searchUrls } }];"
+      },
+      "id": "generate-urls",
+      "name": "Generate Search URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorId": {
+          "__rl": true,
+          "value": "hKByXkMQaC5Qt9UMN",
+          "mode": "list",
+          "cachedResultName": "Linkedin Jobs Scraper - PPR (curious_coder/linkedin-jobs-scraper)",
+          "cachedResultUrl": "https://console.apify.com/actors/hKByXkMQaC5Qt9UMN/input"
+        },
+        "customBody": "={\n    \"count\": 200,\n    \"scrapeCompany\": true,\n    \"urls\": {{ JSON.stringify($('Generate Search URLs').item.json.urls) }}\n}",
+        "authentication": "apifyOAuth2Api"
+      },
+      "id": "apify-scraper",
+      "name": "Apify LinkedIn Jobs Scraper",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [440, 0],
+      "credentials": {
+        "apifyOAuth2Api": {
+          "id": "1ah5uAaTWa8xzxcy",
+          "name": "Apify account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter and transform LinkedIn job results for MicroSponsor AI\n// Focus on small companies (≤100 employees) that are likely visa sponsors\nconst items = $input.all();\nconst jobs = [];\n\nfor (const item of items) {\n  const d = item.json;\n  \n  // Extract company size - filter for micro-SMEs\n  let employeeCount = 50; // default\n  const companySize = d.companySize || d.company?.employeeCount || '';\n  if (typeof companySize === 'string') {\n    const match = companySize.match(/(\\d+)/);\n    if (match) employeeCount = parseInt(match[1]);\n  } else if (typeof companySize === 'number') {\n    employeeCount = companySize;\n  }\n  \n  // Skip large companies (>100 employees)\n  if (employeeCount > 100) continue;\n  \n  // Extract salary info\n  let salaryMin = 25000;\n  let salaryMax = 40000;\n  const salary = d.salary || d.salaryInfo || '';\n  if (typeof salary === 'string') {\n    const nums = salary.match(/[\\d,]+/g);\n    if (nums && nums.length >= 2) {\n      salaryMin = parseInt(nums[0].replace(/,/g, ''));\n      salaryMax = parseInt(nums[1].replace(/,/g, ''));\n    } else if (nums && nums.length === 1) {\n      salaryMin = parseInt(nums[0].replace(/,/g, ''));\n      salaryMax = salaryMin + 10000;\n    }\n  }\n  \n  // Build job object\n  jobs.push({\n    company: d.companyName || d.company?.name || 'Unknown',\n    jobTitle: d.title || d.jobTitle || 'Unknown Role',\n    location: d.location || d.jobLocation || 'United Kingdom',\n    employeeCount: employeeCount,\n    salaryMin: salaryMin,\n    salaryMax: salaryMax,\n    companyDescription: d.companyDescription || d.company?.description || '',\n    industry: d.companyIndustry || d.company?.industry || 'Technology',\n    linkedinUrl: d.url || d.jobUrl || '',\n    companyLinkedinUrl: d.companyUrl || d.company?.url || '',\n    linkedinDescription: (d.description || d.jobDescription || '').substring(0, 2000),\n    hiringManager: d.posterName || d.recruiter?.name || 'Hiring Manager',\n    hiringManagerEmail: d.posterEmail || '',\n    isNewEntrantFriendly: true,\n    postedDays: 0\n  });\n}\n\nreturn [{ json: { jobs: jobs, totalFound: jobs.length } }];"
+      },
+      "id": "filter-transform",
+      "name": "Filter SME Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MICROSPONSOR_WEBHOOK_URL || 'https://microspons-rezhphfb.manus.space/api/webhook/jobs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-webhook-secret",
+              "value": "microsponsor-n8n-2024"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jobs: $json.jobs }) }}"
+      },
+      "id": "webhook-push",
+      "name": "Push to MicroSponsor AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Search URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Search URLs": {
+      "main": [
+        [
+          {
+            "node": "Apify LinkedIn Jobs Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify LinkedIn Jobs Scraper": {
+      "main": [
+        [
+          {
+            "node": "Filter SME Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter SME Jobs": {
+      "main": [
+        [
+          {
+            "node": "Push to MicroSponsor AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

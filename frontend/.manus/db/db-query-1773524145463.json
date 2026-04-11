@@ -1,0 +1,25 @@
+{
+  "query": "SELECT nameNormalised FROM sponsors WHERE nameNormalised LIKE '%tata%' LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT nameNormalised FROM sponsors WHERE nameNormalised LIKE '%tata%' LIMIT 5;",
+  "rows": [
+    {
+      "nameNormalised": "datatank ltd"
+    },
+    {
+      "nameNormalised": "kimble applications limited t/a kantata"
+    },
+    {
+      "nameNormalised": "munir tatar limited t/a munir tatar associates"
+    },
+    {
+      "nameNormalised": "quantatative limited"
+    },
+    {
+      "nameNormalised": "tata autocomp systems limited"
+    }
+  ],
+  "messages": [],
+  "stdout": "nameNormalised\ndatatank ltd\nkimble applications limited t/a kantata\nmunir tatar limited t/a munir tatar associates\nquantatative limited\ntata autocomp systems limited\n",
+  "stderr": "",
+  "execution_time_ms": 132
+}

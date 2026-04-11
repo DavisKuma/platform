@@ -1,0 +1,64 @@
+{
+  "query": "SELECT id, company, employeeCount, source FROM jobs WHERE company LIKE '%Tata%' OR company LIKE '%Consultancy%' OR employeeCount > 50 ORDER BY employeeCount DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT id, company, employeeCount, source FROM jobs WHERE company LIKE '%Tata%' OR company LIKE '%Consultancy%' OR employeeCount > 50 ORDER BY employeeCount DESC;",
+  "rows": [
+    {
+      "id": "25",
+      "company": "Tata Consultancy Services UK Limited",
+      "employeeCount": "90",
+      "source": "n8n_linkedin"
+    },
+    {
+      "id": "26",
+      "company": "Tata Consultancy Services UK Limited",
+      "employeeCount": "90",
+      "source": "n8n_linkedin"
+    },
+    {
+      "id": "18",
+      "company": "Quantum Bridge",
+      "employeeCount": "88",
+      "source": "manual"
+    },
+    {
+      "id": "24",
+      "company": "TATA CONSULTANCY SERVICES UK LIMITED",
+      "employeeCount": "85",
+      "source": "n8n_linkedin"
+    },
+    {
+      "id": "11",
+      "company": "CloudNest",
+      "employeeCount": "73",
+      "source": "manual"
+    },
+    {
+      "id": "2",
+      "company": "Zoonou Limited",
+      "employeeCount": "67",
+      "source": "manual"
+    },
+    {
+      "id": "20",
+      "company": "Atlas Compliance",
+      "employeeCount": "61",
+      "source": "manual"
+    },
+    {
+      "id": "7",
+      "company": "FinLedger",
+      "employeeCount": "56",
+      "source": "manual"
+    },
+    {
+      "id": "14",
+      "company": "Aether Audio",
+      "employeeCount": "52",
+      "source": "manual"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcompany\temployeeCount\tsource\n25\tTata Consultancy Services UK Limited\t90\tn8n_linkedin\n26\tTata Consultancy Services UK Limited\t90\tn8n_linkedin\n18\tQuantum Bridge\t88\tmanual\n24\tTATA CONSULTANCY SERVICES UK LIMITED\t85\tn8n_linkedin\n11\tCloudNest\t73\tmanual\n2\tZoonou Limited\t67\tmanual\n20\tAtlas Compliance\t61\tmanual\n7\tFinLedger\t56\tmanual\n14\tAether Audio\t52\tmanual\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

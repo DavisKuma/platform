@@ -1,0 +1,199 @@
+{
+  "query": "SELECT id, company, employeeCount, source, isVerifiedSponsor FROM jobs ORDER BY id DESC LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT id, company, employeeCount, source, isVerifiedSponsor FROM jobs ORDER BY id DESC LIMIT 30;",
+  "rows": [
+    {
+      "id": "27",
+      "company": "Test Small Co",
+      "employeeCount": "25",
+      "source": "n8n_linkedin",
+      "isVerifiedSponsor": "0"
+    },
+    {
+      "id": "26",
+      "company": "Tata Consultancy Services UK Limited",
+      "employeeCount": "90",
+      "source": "n8n_linkedin",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "25",
+      "company": "Tata Consultancy Services UK Limited",
+      "employeeCount": "90",
+      "source": "n8n_linkedin",
+      "isVerifiedSponsor": "0"
+    },
+    {
+      "id": "24",
+      "company": "TATA CONSULTANCY SERVICES UK LIMITED",
+      "employeeCount": "85",
+      "source": "n8n_linkedin",
+      "isVerifiedSponsor": "0"
+    },
+    {
+      "id": "23",
+      "company": "Beacon Insights",
+      "employeeCount": "48",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "22",
+      "company": "Pixel Forge",
+      "employeeCount": "27",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "21",
+      "company": "Ripple Energy",
+      "employeeCount": "36",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "20",
+      "company": "Atlas Compliance",
+      "employeeCount": "61",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "19",
+      "company": "FreshPlate",
+      "employeeCount": "42",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "18",
+      "company": "Quantum Bridge",
+      "employeeCount": "88",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "17",
+      "company": "Hive Collective",
+      "employeeCount": "24",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "16",
+      "company": "Kinetic Labs",
+      "employeeCount": "31",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "15",
+      "company": "Bloom Gardens",
+      "employeeCount": "19",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "14",
+      "company": "Aether Audio",
+      "employeeCount": "52",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "13",
+      "company": "PetPal UK",
+      "employeeCount": "8",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "12",
+      "company": "TrueNorth Legal",
+      "employeeCount": "38",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "11",
+      "company": "CloudNest",
+      "employeeCount": "73",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "10",
+      "company": "Mosaic Media",
+      "employeeCount": "15",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "9",
+      "company": "Orbital Robotics",
+      "employeeCount": "41",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "8",
+      "company": "LearnLoop",
+      "employeeCount": "29",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "7",
+      "company": "FinLedger",
+      "employeeCount": "56",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "6",
+      "company": "Craft Studio UK",
+      "employeeCount": "12",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "5",
+      "company": "Nexus Health AI",
+      "employeeCount": "18",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "4",
+      "company": "Greenfield Digital",
+      "employeeCount": "45",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "3",
+      "company": "DataVista Solutions",
+      "employeeCount": "22",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "2",
+      "company": "Zoonou Limited",
+      "employeeCount": "67",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    },
+    {
+      "id": "1",
+      "company": "SecondWind Pro",
+      "employeeCount": "34",
+      "source": "manual",
+      "isVerifiedSponsor": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcompany\temployeeCount\tsource\tisVerifiedSponsor\n27\tTest Small Co\t25\tn8n_linkedin\t0\n26\tTata Consultancy Services UK Limited\t90\tn8n_linkedin\t1\n25\tTata Consultancy Services UK Limited\t90\tn8n_linkedin\t0\n24\tTATA CONSULTANCY SERVICES UK LIMITED\t85\tn8n_linkedin\t0\n23\tBeacon Insights\t48\tmanual\t1\n22\tPixel Forge\t27\tmanual\t1\n21\tRipple Energy\t36\tmanual\t1\n20\tAtlas Compliance\t61\tmanual\t1\n19\tFreshPlate\t42\tmanual\t1\n18\tQuantum Bridge\t88\tmanual\t1\n17\tHive Collective\t24\tmanual\t1\n16\tKinetic Labs\t31\tmanual\t1\n15\tBloom Gardens\t19\tmanual\t1\n14\tAether Audio\t52\tmanual\t1\n13\tPetPal UK\t8\tmanual\t1\n12\tTrueNorth Legal\t38\tmanual\t1\n11\tCloudNest\t73\tmanual\t1\n10\tMosaic Media\t15\tmanual\t1\n9\tOrbital Robotics\t41\tmanual\t1\n8\tLearnLoop\t29\tmanual\t1\n7\tFinLedger\t56\tmanual\t1\n6\tCraft Studio UK\t12\tmanual\t1\n5\tNexus Health AI\t18\tmanual\t1\n4\tGreenfield Digital\t45\tmanual\t1\n3\tDataVista Solutions\t22\tmanual\t1\n2\tZoonou Limited\t67\tmanual\t1\n1\tSecondWind Pro\t34\tmanual\t1\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

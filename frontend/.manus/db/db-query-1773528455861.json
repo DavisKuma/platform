@@ -1,0 +1,9 @@
+{
+  "query": "SELECT id, company, employeeCount, source, isVerifiedSponsor FROM jobs WHERE employeeCount > 100 ORDER BY employeeCount DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2cDb5Hf2U12UspD.root --database REzhPHfbXGKqcVNEDV6trD --execute SELECT id, company, employeeCount, source, isVerifiedSponsor FROM jobs WHERE employeeCount > 100 ORDER BY employeeCount DESC;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 57
+}
