@@ -48,32 +48,31 @@ def fetch_reed_jobs() -> list[dict]:
         all_jobs.extend(results)
         log.info("  Reed: fetched %d jobs so far", len(all_jobs))
 
-        # Reed caps at 100 per request; stop after 1000 to be safe
-        if len(results) < REED_RESULTS_PER_PAGE or len(all_jobs) >= 1000:
+        # Reed caps at 100 per request; stop after 300 to keep it fast
+        if len(results) < REED_RESULTS_PER_PAGE or len(all_jobs) >= 300:
             break
 
         skip += REED_RESULTS_PER_PAGE
-        time.sleep(0.3)
+        time.sleep(0.1)
 
-    # Filter to last 24 hours client-side
-    cutoff = datetime.now() - timedelta(hours=24)
+    # Filter to last 24 hours client-side (compare dates only, not times)
+    cutoff_date = (datetime.now() - timedelta(hours=24)).date()
     recent = []
     for job in all_jobs:
         date_str = job.get("date", "")
         if not date_str:
+            recent.append(job)  # keep if no date field
             continue
         try:
-            posted = datetime.strptime(date_str, "%d/%m/%Y")
-            if posted >= cutoff.replace(hour=0, minute=0, second=0):
-                recent.append(job)
+            posted = datetime.strptime(date_str, "%d/%m/%Y").date()
         except ValueError:
-            # Try ISO format as fallback
             try:
-                posted = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                if posted.replace(tzinfo=None) >= cutoff:
-                    recent.append(job)
+                posted = datetime.fromisoformat(date_str.replace("Z", "+00:00")).date()
             except ValueError:
                 recent.append(job)  # keep if date can't be parsed
+                continue
+        if posted >= cutoff_date:
+            recent.append(job)
 
     log.info("Reed: %d jobs total, %d from last 24h", len(all_jobs), len(recent))
     return recent

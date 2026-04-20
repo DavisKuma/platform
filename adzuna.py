@@ -42,13 +42,13 @@ def fetch_adzuna_jobs() -> list[dict]:
     data = resp.json()
 
     total = data.get("count", 0)
-    total_pages = min(math.ceil(total / RESULTS_PER_PAGE), 20)
-    log.info("Found %d total jobs across %d pages", total, total_pages)
+    total_pages = min(math.ceil(total / RESULTS_PER_PAGE), 10)  # cap at 10 pages (500 jobs)
+    log.info("Found %d total jobs, fetching %d pages", total, total_pages)
 
     all_jobs.extend(data.get("results", []))
 
     for page in range(2, total_pages + 1):
-        time.sleep(0.3)
+        time.sleep(0.1)
         resp = requests.get(f"{ADZUNA_BASE_URL}/{page}", params=params, timeout=30)
         resp.raise_for_status()
         all_jobs.extend(resp.json().get("results", []))

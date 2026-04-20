@@ -34,19 +34,18 @@ interface JobMatch {
   source: string;
 }
 
-type AnalysisStep = "idle" | "uploading" | "analysing" | "matching" | "done" | "error";
+type AnalysisStep = "idle" | "uploading" | "processing" | "done" | "error";
 
 const STEP_LABELS: Record<AnalysisStep, string> = {
   idle: "Ready to upload",
   uploading: "Uploading your CV...",
-  analysing: "AI is analysing your CV & scraping live jobs...",
-  matching: "Matching you with sponsor-verified employers...",
+  processing: "Processing...",
   done: "Analysis complete!",
   error: "Something went wrong",
 };
 
 const STEP_PROGRESS: Record<AnalysisStep, number> = {
-  idle: 0, uploading: 15, analysing: 45, matching: 75, done: 100, error: 0,
+  idle: 0, uploading: 15, processing: 50, done: 100, error: 0,
 };
 
 function getScoreColor(score: number) {
@@ -73,6 +72,7 @@ export default function CvAnalysis() {
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [progressMsg, setProgressMsg] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
@@ -88,13 +88,14 @@ export default function CvAnalysis() {
     setStep("uploading");
     setErrorMsg(null);
     setMatches([]);
+    setProgressMsg("");
 
     try {
-      const stepTimer1 = setTimeout(() => setStep("analysing"), 1500);
-      const stepTimer2 = setTimeout(() => setStep("matching"), 8000);
-      const result = await api.matchJobs(file);
-      clearTimeout(stepTimer1);
-      clearTimeout(stepTimer2);
+      // Upload returns instantly, then polls for results with real progress
+      setStep("processing");
+      const result = await api.matchJobs(file, 20, (progress) => {
+        setProgressMsg(progress);
+      });
 
       const mapped: JobMatch[] = (result.recommendations || []).map((rec: Record<string, any>, i: number) => ({
         id: String(i),
@@ -196,16 +197,16 @@ export default function CvAnalysis() {
                       <Loader2 className="w-8 h-8 text-[oklch(0.488_0.243_264.376)] animate-spin" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-xl text-foreground mb-2">{STEP_LABELS[step]}</h3>
+                      <h3 className="font-display font-bold text-xl text-foreground mb-2">{progressMsg || STEP_LABELS[step]}</h3>
                       {fileName && <p className="text-sm text-muted-foreground flex items-center justify-center gap-2"><FileText className="w-4 h-4" /> {fileName}</p>}
                     </div>
                     <div className="max-w-md mx-auto">
                       <Progress value={STEP_PROGRESS[step]} className="h-2" />
                       <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                        <span>Upload</span><span>Analyse</span><span>Match</span><span>Done</span>
+                        <span>Upload</span><span>Analyse &amp; Score</span><span>Done</span>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">This usually takes 20-40 seconds...</p>
+                    <p className="text-xs text-muted-foreground">Processing in the background...</p>
                   </div>
                 </CardContent>
               </Card>

@@ -1,11 +1,16 @@
 import csv
+import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 from openai import OpenAI
 
 from config import log, OPENAI_API_KEY, OPENAI_MODEL
 from cv_reader import read_cv
+
+# ── CV profile cache (hash of CV text → extracted profile) ──────────────────
+_profile_cache: dict[str, dict] = {}
 
 
 def _sanitize(text: str) -> str:
@@ -23,10 +28,16 @@ def _get_client() -> OpenAI:
 
 
 def extract_cv_profile(cv_text: str) -> dict:
-    """Use OpenAI to extract a structured profile from CV text."""
+    """Use OpenAI to extract a structured profile from CV text.
+    Results are cached by content hash to avoid redundant API calls."""
+    cv_hash = hashlib.sha256(cv_text.encode()).hexdigest()[:16]
+    if cv_hash in _profile_cache:
+        log.info("CV profile cache hit (hash=%s)", cv_hash)
+        return _profile_cache[cv_hash]
+
     client = _get_client()
 
-    log.info("Extracting CV profile via OpenAI ...")
+    log.info("Extracting CV profile via OpenAI (hash=%s) ...", cv_hash)
     resp = client.chat.completions.create(
         model=OPENAI_MODEL,
         temperature=0,
@@ -56,6 +67,7 @@ def extract_cv_profile(cv_text: str) -> dict:
         len(profile.get("job_titles", [])),
         profile.get("experience_level", "unknown"),
     )
+    _profile_cache[cv_hash] = profile
     return profile
 
 
@@ -148,11 +160,22 @@ def _keyword_prefilter(profile: dict, jobs: list[dict], max_jobs: int = 75) -> l
     return filtered if filtered else jobs[:max_jobs]
 
 
-def recommend_jobs_from_list(cv_text: str, all_jobs: list[dict], top_n: int = 20) -> list[dict]:
-    """Score a list of jobs against CV text. Used by the REST API."""
-    profile = extract_cv_profile(cv_text)
+def recommend_jobs_from_list(
+    cv_text: str, all_jobs: list[dict], top_n: int = 20, progress_cb=None,
+    profile: dict | None = None,
+) -> list[dict]:
+    """Score a list of jobs against CV text. Used by the REST API.
+    If profile is already extracted (e.g. done in parallel), pass it to skip re-extraction."""
+    if profile is None:
+        if progress_cb:
+            progress_cb("Extracting CV profile...")
+        profile = extract_cv_profile(cv_text)
+    if progress_cb:
+        progress_cb("Filtering jobs by keywords...")
     filtered = _keyword_prefilter(profile, all_jobs)
-    return _score_and_rank(profile, filtered, top_n)
+    if progress_cb:
+        progress_cb("Scoring jobs with AI...")
+    return _score_and_rank(profile, filtered, top_n, progress_cb=progress_cb)
 
 
 def recommend_jobs(csv_path: str, cv_path: str, top_n: int = 20) -> list[dict]:
@@ -171,21 +194,33 @@ def recommend_jobs(csv_path: str, cv_path: str, top_n: int = 20) -> list[dict]:
     return _score_and_rank(profile, all_jobs, top_n)
 
 
-def _score_and_rank(profile: dict, all_jobs: list[dict], top_n: int) -> list[dict]:
-    """Score jobs against a profile and return top N."""
+def _score_and_rank(
+    profile: dict,
+    all_jobs: list[dict],
+    top_n: int,
+    progress_cb=None,
+) -> list[dict]:
+    """Score jobs against a profile and return top N.
+    Batches are scored in parallel via ThreadPoolExecutor."""
     batch_size = 50
+    batches = [all_jobs[i : i + batch_size] for i in range(0, len(all_jobs), batch_size)]
+    total_batches = len(batches)
     all_scored = []
 
-    for i in range(0, len(all_jobs), batch_size):
-        batch = all_jobs[i : i + batch_size]
-        log.info(
-            "  Scoring batch %d/%d (%d jobs) ...",
-            (i // batch_size) + 1,
-            -(-len(all_jobs) // batch_size),
-            len(batch),
-        )
-        scored = score_jobs_batch(profile, batch)
-        all_scored.extend(scored)
+    log.info("Scoring %d jobs in %d parallel batches ...", len(all_jobs), total_batches)
+
+    with ThreadPoolExecutor(max_workers=min(4, total_batches)) as pool:
+        futures = {
+            pool.submit(score_jobs_batch, profile, batch): idx
+            for idx, batch in enumerate(batches)
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            scored = future.result()
+            all_scored.extend(scored)
+            log.info("  Batch %d/%d done (%d scored)", idx + 1, total_batches, len(scored))
+            if progress_cb:
+                progress_cb(f"Scored {len(all_scored)}/{len(all_jobs)} jobs")
 
     MIN_SCORE = 50
     all_scored = [j for j in all_scored if j.get("Relevance Score", 0) >= MIN_SCORE]
