@@ -134,7 +134,7 @@ def score_jobs_batch(profile: dict, jobs: list[dict]) -> list[dict]:
     return scored_jobs
 
 
-def _keyword_prefilter(profile: dict, jobs: list[dict], max_jobs: int = 75) -> list[dict]:
+def _keyword_prefilter(profile: dict, jobs: list[dict], max_jobs: int = 150) -> list[dict]:
     """Fast keyword pre-filter: keep only jobs whose title/category overlap with CV skills/titles.
     This reduces the number of jobs sent to OpenAI from 300+ to ~75."""
     keywords = set()
@@ -222,7 +222,7 @@ def _score_and_rank(
             if progress_cb:
                 progress_cb(f"Scored {len(all_scored)}/{len(all_jobs)} jobs")
 
-    MIN_SCORE = 50
+    MIN_SCORE = 30
     all_scored = [j for j in all_scored if j.get("Relevance Score", 0) >= MIN_SCORE]
     all_scored.sort(key=lambda x: x.get("Relevance Score", 0), reverse=True)
     top = all_scored[:top_n]
