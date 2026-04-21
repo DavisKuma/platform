@@ -8,6 +8,8 @@ Usage:
 """
 
 import argparse
+import glob
+import os
 from datetime import datetime
 
 from config import log, SUPABASE_URL
@@ -43,6 +45,17 @@ def _save_recs_to_supabase(recommendations: list[dict], cv_path: str):
         log.warning("Failed to save recommendations to Supabase: %s", e)
 
 
+def _cleanup_old_csvs(prefix: str, keep: str):
+    """Delete old CSVs matching prefix, keeping only the new file."""
+    for old in glob.glob(f"{prefix}_*.csv"):
+        if old != keep:
+            try:
+                os.remove(old)
+                log.info("Deleted old CSV: %s", old)
+            except OSError:
+                pass
+
+
 def run_scraper() -> tuple[str, list[dict]]:
     """Run the full scraping pipeline. Returns (csv_path, matched_jobs)."""
     output_csv = f"adzuna_sponsored_jobs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -52,7 +65,8 @@ def run_scraper() -> tuple[str, list[dict]]:
     reed_jobs = fetch_reed_jobs()
     matched = match_jobs_to_sponsors(adzuna_jobs, reed_jobs, sponsors)
 
-    # Save to CSV
+    # Save to CSV (delete old ones first)
+    _cleanup_old_csvs("adzuna_sponsored_jobs", output_csv)
     save_csv(matched, output_csv)
 
     # Save to Supabase
@@ -76,7 +90,8 @@ def run_recommender(csv_path: str, cv_path: str):
 
     recommendations = recommend_jobs(csv_path, cv_path, top_n=20)
 
-    # Save to CSV
+    # Save to CSV (delete old ones first)
+    _cleanup_old_csvs("recommendations", rec_csv)
     save_recommendations(recommendations, rec_csv)
 
     # Save to Supabase
