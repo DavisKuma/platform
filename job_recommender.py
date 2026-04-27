@@ -94,17 +94,18 @@ def score_jobs_batch(profile: dict, jobs: list[dict]) -> list[dict]:
             {
                 "role": "system",
                 "content": (
-                    "You are a strict job matching assistant. Given a candidate profile and "
+                    "You are a job matching assistant. Given a candidate profile and "
                     "a list of jobs, score each job's relevance from 0-100.\n\n"
-                    "SCORING RULES (be strict):\n"
-                    "- 80-100: Direct skills match AND relevant job title (e.g. data scientist CV → data analyst role)\n"
-                    "- 60-79: Strong skills overlap with related field (e.g. marketing CV → content role)\n"
-                    "- 40-59: Some transferable skills but different field\n"
-                    "- 20-39: Minimal relevance, mostly unrelated\n"
-                    "- 0-19: Completely unrelated\n\n"
-                    "IMPORTANT: A job in an unrelated field should score BELOW 40 even if it's entry-level. "
-                    "Do NOT inflate scores just because a job exists in the same broad industry. "
-                    "Focus on whether the candidate's specific SKILLS and EXPERIENCE match the job requirements.\n\n"
+                    "SCORING RULES:\n"
+                    "- 80-100: Direct skills match AND relevant job title\n"
+                    "- 60-79: Strong skills overlap or closely related field\n"
+                    "- 40-59: Transferable skills, related industry, or the candidate could reasonably transition into this role\n"
+                    "- 25-39: Some relevance — entry-level roles the candidate could apply for, or partial skill overlap\n"
+                    "- 10-24: Weak connection, mostly unrelated\n"
+                    "- 0-9: Completely unrelated\n\n"
+                    "Consider transferable skills generously. Entry-level roles should score higher "
+                    "if the candidate has relevant education or adjacent experience. "
+                    "A graduate with any degree can reasonably apply for many entry-level roles (score 30+).\n\n"
                     "Return JSON: {\"scores\": [{\"index\": 0, \"score\": 85, "
                     "\"reason\": \"Strong match because...\"}]}\n"
                     "Include ALL jobs in the output."
@@ -135,28 +136,39 @@ def score_jobs_batch(profile: dict, jobs: list[dict]) -> list[dict]:
 
 
 def _keyword_prefilter(profile: dict, jobs: list[dict], max_jobs: int = 150) -> list[dict]:
-    """Fast keyword pre-filter: keep only jobs whose title/category overlap with CV skills/titles.
-    This reduces the number of jobs sent to OpenAI from 300+ to ~75."""
+    """Fast keyword pre-filter: keep jobs whose title/category/description overlap with CV keywords.
+    Uses skills, job titles, industries, and education as keyword sources."""
     keywords = set()
-    for skill in profile.get("skills", []):
-        for word in skill.lower().split():
-            if len(word) > 2:
-                keywords.add(word)
-    for title in profile.get("job_titles", []):
-        for word in title.lower().split():
-            if len(word) > 2:
-                keywords.add(word)
+    # Collect keywords from all profile fields
+    for field in ("skills", "job_titles", "industries", "education"):
+        for item in profile.get(field, []):
+            for word in item.lower().split():
+                cleaned = word.strip(",.;:()")
+                if len(cleaned) > 2:
+                    keywords.add(cleaned)
+
+    # Also add experience level as keyword
+    level = profile.get("experience_level", "")
+    if level:
+        keywords.add(level)
 
     scored = []
     for job in jobs:
-        text = f"{job.get('Job Title', '')} {job.get('Category', '')}".lower()
+        # Search across more fields for better recall
+        text = " ".join([
+            job.get("Job Title", ""),
+            job.get("Category", ""),
+            job.get("Description", ""),
+            job.get("Company", ""),
+        ]).lower()
         hits = sum(1 for kw in keywords if kw in text)
         if hits > 0:
             scored.append((hits, job))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     filtered = [job for _, job in scored[:max_jobs]]
-    log.info("Pre-filter: %d/%d jobs matched CV keywords (keeping top %d)", len(scored), len(jobs), len(filtered))
+    log.info("Pre-filter: %d/%d jobs matched CV keywords (%d keywords, keeping top %d)",
+             len(scored), len(jobs), len(keywords), len(filtered))
     return filtered if filtered else jobs[:max_jobs]
 
 
@@ -222,10 +234,20 @@ def _score_and_rank(
             if progress_cb:
                 progress_cb(f"Scored {len(all_scored)}/{len(all_jobs)} jobs")
 
-    MIN_SCORE = 30
-    all_scored = [j for j in all_scored if j.get("Relevance Score", 0) >= MIN_SCORE]
-    all_scored.sort(key=lambda x: x.get("Relevance Score", 0), reverse=True)
-    top = all_scored[:top_n]
+    # Log score distribution before filtering
+    all_scores = [j.get("Relevance Score", 0) for j in all_scored]
+    if all_scores:
+        log.info("Score distribution: min=%d, max=%d, avg=%.1f, median=%d",
+                 min(all_scores), max(all_scores),
+                 sum(all_scores) / len(all_scores),
+                 sorted(all_scores)[len(all_scores) // 2])
+
+    MIN_SCORE = 20
+    above_threshold = [j for j in all_scored if j.get("Relevance Score", 0) >= MIN_SCORE]
+    log.info("Jobs above MIN_SCORE(%d): %d/%d", MIN_SCORE, len(above_threshold), len(all_scored))
+
+    above_threshold.sort(key=lambda x: x.get("Relevance Score", 0), reverse=True)
+    top = above_threshold[:top_n]
 
     log.info("Top %d recommendations ready (scores: %d-%d)",
              len(top),

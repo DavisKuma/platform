@@ -5,6 +5,7 @@ Endpoints:
     POST /api/match-jobs          Upload CV → returns task_id immediately (<500ms)
     GET  /api/match-jobs/{id}     Poll for task status / results
     GET  /api/scrape              Scrape jobs only (no CV matching)
+    POST /api/hiring-managers     Find hiring managers at a company for a role
     GET  /api/health              Health check
 
 Run:
@@ -20,6 +21,7 @@ from threading import Thread
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from config import log, SUPABASE_URL
 from sponsors import download_sponsor_list
@@ -28,6 +30,7 @@ from reed import fetch_reed_jobs
 from matcher import match_jobs_to_sponsors
 from cv_reader import read_cv
 from job_recommender import extract_cv_profile, recommend_jobs_from_list
+from hiring_manager import find_hiring_managers
 
 # ── In-memory cache for scraped+matched jobs (avoids re-scraping every request)
 _jobs_cache: list[dict] = []
@@ -275,6 +278,27 @@ def get_match_result(task_id: str):
         response["error"] = task["error"]
 
     return response
+
+
+# ── Hiring Manager Lookup ────────────────────────────────────────────────────
+
+class HiringManagerRequest(BaseModel):
+    company: str
+    job_title: str
+
+
+@app.post("/api/hiring-managers")
+def get_hiring_managers(req: HiringManagerRequest):
+    """Find likely hiring managers / decision-makers at a company for a given role."""
+    if not req.company or not req.job_title:
+        raise HTTPException(status_code=400, detail="company and job_title are required")
+
+    try:
+        people = find_hiring_managers(req.company, req.job_title)
+        return {"people": people}
+    except Exception as e:
+        log.exception("Hiring manager lookup failed for '%s'", req.company)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
