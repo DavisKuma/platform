@@ -48,10 +48,11 @@ def _sanitize(text: str) -> str:
     )
 
 
-def _build_linkedin_search_url(full_name: str, company: str) -> str:
-    """Build a LinkedIn people search URL for a specific person at a company."""
-    query = f"{full_name} {company}"
-    return f"https://www.linkedin.com/search/results/people/?keywords={quote_plus(query)}"
+def _build_linkedin_search_url(full_name: str, company: str, title: str = "") -> str:
+    """Build a LinkedIn people search URL for a specific person at a company.
+    Includes name, company, and title for more precise results."""
+    query = f"{full_name} {title} {company}".strip()
+    return f"https://www.linkedin.com/search/results/people/?keywords={quote_plus(query)}&origin=GLOBAL_SEARCH_HEADER"
 
 
 # ── AI-Powered Hiring Manager Identification ─────────────────────────────────
@@ -109,11 +110,12 @@ def _identify_hiring_managers(company: str, job_title: str) -> list[dict]:
     result = json.loads(resp.choices[0].message.content)
     people = result.get("people", [])
 
-    # Add LinkedIn search URLs
+    # Add LinkedIn search URLs (include title for more precise results)
     for person in people:
         person["linkedin_url"] = _build_linkedin_search_url(
             person.get("full_name", ""),
             company,
+            person.get("title", ""),
         )
 
     # Sort by score descending
