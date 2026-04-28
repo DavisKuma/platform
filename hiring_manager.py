@@ -2,13 +2,12 @@
 Hiring Manager Finder
 
 Uses OpenAI to identify likely hiring managers / decision-makers at a company
-for a given role, and generates clickable LinkedIn search URLs for each person.
+for a given role, then resolves their actual LinkedIn profile URLs via search.
 
 Approach:
   1. Ask GPT-4o-mini to identify the most likely people (by title/role)
      who would be the hiring decision-maker at the company for the given job.
-  2. Generate a LinkedIn search URL for each person so the user can find
-     their actual profile and reach out.
+  2. Search DuckDuckGo for each person to find their actual LinkedIn profile URL.
   3. Cache results by company + job_title to avoid repeat API calls.
 
 Results are cached in memory for 2 hours.
@@ -17,9 +16,10 @@ Results are cached in memory for 2 hours.
 import json
 import time
 import hashlib
-from urllib.parse import quote_plus
+from concurrent.futures import ThreadPoolExecutor
 
 from openai import OpenAI
+from ddgs import DDGS
 
 from config import log, OPENAI_API_KEY, OPENAI_MODEL
 
@@ -48,11 +48,51 @@ def _sanitize(text: str) -> str:
     )
 
 
-def _build_linkedin_search_url(full_name: str, company: str, title: str = "") -> str:
-    """Build a LinkedIn people search URL for a specific person at a company.
-    Includes name, company, and title for more precise results."""
-    query = f"{full_name} {title} {company}".strip()
-    return f"https://www.linkedin.com/search/results/people/?keywords={quote_plus(query)}&origin=GLOBAL_SEARCH_HEADER"
+def _find_linkedin_url(query: str) -> str | None:
+    """Search DuckDuckGo for a LinkedIn profile URL matching the query.
+    Returns the first linkedin.com/in/ URL found, or None."""
+    try:
+        results = DDGS().text(f"{query} site:linkedin.com/in", max_results=5)
+        for r in results:
+            url = r.get("href", "")
+            if "linkedin.com/in/" in url:
+                return url
+    except Exception as e:
+        log.warning("LinkedIn search failed for '%s': %s", query, e)
+    return None
+
+
+def _resolve_linkedin_urls(people: list[dict], company: str) -> None:
+    """Resolve actual LinkedIn profile URLs for each person in parallel.
+    Updates each person dict in-place with 'linkedin_url'."""
+
+    def _resolve_one(person: dict) -> None:
+        name = person.get("full_name", "")
+        title = person.get("title", "")
+        is_verified = person.get("is_verified", False)
+
+        # Verified = search by real name, Unverified = search by title at company
+        if is_verified and name:
+            query = f"{name} {company}"
+        else:
+            query = f"{title} {company}"
+
+        url = _find_linkedin_url(query)
+
+        if url:
+            person["linkedin_url"] = url
+            # Extract the real name from LinkedIn title if we searched by title
+            log.info("  Found LinkedIn: %s → %s", query, url)
+        else:
+            # Fallback: Google search link
+            from urllib.parse import quote_plus
+            fallback_query = f"{title} {company} LinkedIn" if not is_verified else f"{name} {company} LinkedIn"
+            person["linkedin_url"] = f"https://www.google.com/search?q={quote_plus(fallback_query)}"
+            log.info("  No LinkedIn found for '%s', using Google fallback", query)
+
+    # Resolve all in parallel (max 3 concurrent searches)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        pool.map(_resolve_one, people)
 
 
 # ── AI-Powered Hiring Manager Identification ─────────────────────────────────
@@ -110,13 +150,9 @@ def _identify_hiring_managers(company: str, job_title: str) -> list[dict]:
     result = json.loads(resp.choices[0].message.content)
     people = result.get("people", [])
 
-    # Add LinkedIn search URLs (include title for more precise results)
-    for person in people:
-        person["linkedin_url"] = _build_linkedin_search_url(
-            person.get("full_name", ""),
-            company,
-            person.get("title", ""),
-        )
+    # Resolve actual LinkedIn profile URLs via DuckDuckGo search
+    log.info("Resolving LinkedIn URLs for %d people at '%s'...", len(people), company)
+    _resolve_linkedin_urls(people, company)
 
     # Sort by score descending
     people.sort(key=lambda x: x.get("ai_score", 0), reverse=True)
