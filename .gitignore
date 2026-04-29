@@ -32,6 +32,9 @@ frontend/dist/
 frontend/.env
 frontend/.env.local
 
+# Sponsor register cache
+.cache/
+
 # Misc
 command.txt
 *.log
