@@ -188,31 +188,20 @@ def _score_people(people: list[dict], job_title: str) -> list[dict]:
     return people
 
 
-def _fallback_role_suggestions(company: str, job_title: str) -> list[dict]:
-    """When web search finds no one, suggest the roles to search for
-    and provide LinkedIn search URLs so the user can find them."""
-    roles = [
-        {"title": f"Head of Department for {job_title}", "score": 90},
-        {"title": "HR Manager", "score": 65},
-        {"title": "Talent Acquisition Manager", "score": 60},
-    ]
-
-    people = []
-    for role in roles:
-        keywords = f"{role['title']} {company}"
-        people.append({
-            "full_name": role["title"],
-            "title": f"Search for this role at {company}",
-            "linkedin_url": (
-                f"https://www.linkedin.com/search/results/people/"
-                f"?keywords={quote_plus(keywords.strip())}"
-            ),
-            "ai_score": role["score"],
-            "reason": f"Search LinkedIn for the {role['title']} at {company}.",
-            "is_verified": False,
-        })
-
-    return people
+def _fallback_company_profile(company: str, job_title: str) -> list[dict]:
+    """When web search finds no specific people, return the company's
+    LinkedIn profile so the user can browse employees directly."""
+    company_slug = quote_plus(company.strip())
+    return [{
+        "full_name": company,
+        "title": "Company LinkedIn Profile",
+        "linkedin_url": (
+            f"https://www.linkedin.com/company/{company_slug}"
+        ),
+        "ai_score": 70,
+        "reason": f"No specific decision-makers found. Visit the company page to find people involved in hiring for {job_title}.",
+        "is_verified": False,
+    }]
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -245,7 +234,7 @@ def find_hiring_managers(company: str, job_title: str, max_results: int = 5) -> 
         log.info("Found %d real people at '%s'", len(people), company)
     else:
         log.warning("No real profiles found for '%s', falling back to role-based suggestions", company)
-        people = _fallback_role_suggestions(company, job_title)
+        people = _fallback_company_profile(company, job_title)
 
     # Keep top results
     top = people[:max_results]
