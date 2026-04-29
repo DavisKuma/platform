@@ -112,8 +112,8 @@ def _search_one_role(client: OpenAI, role: str, company: str) -> dict | None:
         if title_match:
             title = title_match.group(1).strip().strip("*")
 
-        # Build LinkedIn search URL with name + title + company for precision
-        search_query = f"{name} {title} {company}"
+        # Build LinkedIn search URL with name + company only (title makes it too restrictive)
+        search_query = f"{name} {company}"
         linkedin_url = (
             f"https://www.linkedin.com/search/results/people/"
             f"?keywords={quote_plus(search_query)}"
