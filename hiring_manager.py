@@ -1,14 +1,14 @@
 """
 Hiring Manager Finder
 
-Uses OpenAI web search to find real hiring decision-makers at a company
-by searching for their LinkedIn profiles directly.
+Uses OpenAI web search to find real decision-makers at a company
+(C-level, founders, owners, senior managers) and their LinkedIn pages.
 
 Approach:
-  1. Use OpenAI Responses API with web_search to find real people in
-     HR, Talent Acquisition, and department leadership at the company.
-  2. Return their real names and LinkedIn profile URLs.
-  3. Cache results by company + job_title to avoid repeat API calls.
+  1. Find the company's verified LinkedIn page via web search.
+  2. Search for C-level / founders / senior managers at the company.
+  3. Return real names with LinkedIn search URLs + company page.
+  4. Cache results by company + job_title to avoid repeat API calls.
 
 Results are cached in memory for 2 hours.
 """
@@ -51,6 +51,36 @@ def _name_matches_slug(name: str, url: str) -> bool:
     first = name_parts[0]
     last = name_parts[-1]
     return first in slug and last in slug
+
+
+def _search_company_linkedin(client: OpenAI, company: str) -> str | None:
+    """Find the verified LinkedIn company page URL via web search."""
+    try:
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            tools=[{"type": "web_search_preview"}],
+            input=(
+                f"What is the official LinkedIn company page URL for {company}? "
+                f"Find the URL in the format linkedin.com/company/... "
+                f"Return ONLY the URL, nothing else."
+            ),
+        )
+        text = ""
+        for item in response.output:
+            if item.type == "message":
+                for content in item.content:
+                    if hasattr(content, "text"):
+                        text += content.text
+
+        match = re.search(r"https?://(?:www\.)?linkedin\.com/company/[A-Za-z0-9_-]+", text)
+        if match:
+            url = match.group(0).rstrip("/")
+            log.info("  Company LinkedIn page: %s", url)
+            return url
+        return None
+    except Exception as e:
+        log.warning("  Company LinkedIn search failed: %s", e)
+        return None
 
 
 def _search_one_role(client: OpenAI, role: str, company: str) -> dict | None:
@@ -111,6 +141,8 @@ def _search_one_role(client: OpenAI, role: str, company: str) -> dict | None:
         title_match = re.search(r"Title:\s*(.+?)(?:\n|URL:|Source:|Location:|$)", text)
         if title_match:
             title = title_match.group(1).strip().strip("*")
+            # Remove markdown links like ([source](url))
+            title = re.sub(r"\s*\(?\[.*?\]\(.*?\)\)?", "", title).strip()
 
         # Build LinkedIn search URL with name + company only (title makes it too restrictive)
         search_query = f"{name} {company}"
@@ -132,76 +164,71 @@ def _search_one_role(client: OpenAI, role: str, company: str) -> dict | None:
         return None
 
 
-def _find_people_at_company(client: OpenAI, company: str, job_title: str) -> list[dict]:
-    """Search for real people in hiring-related roles at a company.
-    Runs separate searches per role in parallel for better results."""
+def _find_people_at_company(client: OpenAI, company: str, job_title: str) -> tuple[list[dict], str | None]:
+    """Search for real decision-makers and the company LinkedIn page.
+    Runs all searches in parallel. Returns (people_list, company_url)."""
     from concurrent.futures import ThreadPoolExecutor
 
-    # Roles to search for
+    # Target C-level, owners, founders, senior managers
     roles = [
-        f"Hiring Manager or Department Head for {job_title}",
-        "HR Manager or Head of Human Resources",
-        "Talent Acquisition Manager or Head of Recruitment",
-        "Managing Director or CEO",
+        "CEO or Managing Director or Owner",
+        "Founder or Co-Founder",
+        f"Senior Manager or Director of {job_title}",
+        "COO or Operations Director",
     ]
 
     people = []
-    seen_urls = set()
+    seen_lastnames = set()
+    company_url = None
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = {pool.submit(_search_one_role, client, role, company): role for role in roles}
-        for future in futures:
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        # Search for people + company page in parallel
+        people_futures = {pool.submit(_search_one_role, client, role, company): role for role in roles}
+        company_future = pool.submit(_search_company_linkedin, client, company)
+
+        for future in people_futures:
             result = future.result()
-            if result and result["linkedin_url"] not in seen_urls:
-                seen_urls.add(result["linkedin_url"])
-                people.append(result)
+            if result:
+                # Deduplicate by last name (catches "Nik Storonsky" vs "Nikolay Storonsky")
+                lastname = result["full_name"].split()[-1].lower()
+                if lastname not in seen_lastnames:
+                    seen_lastnames.add(lastname)
+                    people.append(result)
+
+        company_url = company_future.result()
 
     log.info("Found %d real people at '%s' from %d role searches", len(people), company, len(roles))
-    return people
+    return people, company_url
 
 
 
 def _score_people(people: list[dict], job_title: str) -> list[dict]:
-    """Assign AI scores based on how likely each person is the decision-maker."""
+    """Assign AI scores based on seniority and decision-making authority."""
     for person in people:
         title_lower = person.get("title", "").lower()
 
-        # Score based on role type
-        if any(kw in title_lower for kw in ["head of", "director", "vp ", "vice president", "chief", "lead"]):
+        if any(kw in title_lower for kw in ["ceo", "owner", "founder", "co-founder", "managing director", "chairman"]):
+            person["ai_score"] = 95
+            person["reason"] = f"Top-level decision-maker — ultimate authority over hiring for {job_title}."
+        elif any(kw in title_lower for kw in ["coo", "cfo", "cto", "chief", "president"]):
             person["ai_score"] = 90
-            person["reason"] = f"Senior leadership role — likely the direct hiring decision-maker for {job_title}."
-        elif any(kw in title_lower for kw in ["manager", "supervisor", "team lead"]):
+            person["reason"] = f"C-suite executive — key decision-maker for {job_title}."
+        elif any(kw in title_lower for kw in ["director", "vp ", "vice president", "head of", "partner"]):
+            person["ai_score"] = 85
+            person["reason"] = f"Senior leadership — likely involved in hiring decisions for {job_title}."
+        elif any(kw in title_lower for kw in ["senior manager", "general manager", "regional manager"]):
             person["ai_score"] = 75
-            person["reason"] = f"Management role — strong influence over hiring for {job_title}."
-        elif any(kw in title_lower for kw in ["talent", "recruiter", "recruitment", "acquisition"]):
+            person["reason"] = f"Senior management — strong influence over hiring for {job_title}."
+        elif any(kw in title_lower for kw in ["manager", "lead", "supervisor"]):
             person["ai_score"] = 65
-            person["reason"] = "Talent acquisition — manages the recruitment pipeline and candidate screening."
-        elif any(kw in title_lower for kw in ["hr ", "human resource", "people"]):
-            person["ai_score"] = 55
-            person["reason"] = "HR team — involved in the hiring process and offer decisions."
+            person["reason"] = f"Management role — may influence hiring for {job_title}."
         else:
             person["ai_score"] = 50
             person["reason"] = f"Relevant team member who may be involved in hiring for {job_title}."
 
-    # Sort by score descending
     people.sort(key=lambda x: x.get("ai_score", 0), reverse=True)
     return people
 
-
-def _fallback_company_profile(company: str, job_title: str) -> list[dict]:
-    """When web search finds no specific people, return the company's
-    LinkedIn profile so the user can browse employees directly."""
-    company_slug = quote_plus(company.strip())
-    return [{
-        "full_name": company,
-        "title": "Company LinkedIn Profile",
-        "linkedin_url": (
-            f"https://www.linkedin.com/company/{company_slug}"
-        ),
-        "ai_score": 70,
-        "reason": f"No specific decision-makers found. Visit the company page to find people involved in hiring for {job_title}.",
-        "is_verified": False,
-    }]
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -227,14 +254,22 @@ def find_hiring_managers(company: str, job_title: str, max_results: int = 5) -> 
     log.info("Finding hiring managers at '%s' for role '%s' via web search", company, job_title)
 
     client = _get_openai_client()
-    people = _find_people_at_company(client, company, job_title)
+    people, company_url = _find_people_at_company(client, company, job_title)
 
     if people:
         people = _score_people(people, job_title)
         log.info("Found %d real people at '%s'", len(people), company)
-    else:
-        log.warning("No real profiles found for '%s', falling back to role-based suggestions", company)
-        people = _fallback_company_profile(company, job_title)
+
+    # Always append company LinkedIn page (verified or guessed)
+    company_entry = {
+        "full_name": company,
+        "title": "Company LinkedIn Page",
+        "linkedin_url": company_url or f"https://www.linkedin.com/company/{quote_plus(company.strip())}",
+        "ai_score": 70 if not people else 40,
+        "reason": f"Browse {company}'s LinkedIn page to find employees and open positions.",
+        "is_verified": False,
+    }
+    people.append(company_entry)
 
     # Keep top results
     top = people[:max_results]
